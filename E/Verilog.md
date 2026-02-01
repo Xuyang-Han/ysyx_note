@@ -70,9 +70,6 @@ endgenerate
 ```
 
 构建100bit的BCD码加法器，点击跳转：
-[BCD码的加法运算 ](####2.BCD码的加法运算)——若无法跳转查找目录“三.其他知识点2.BCD码的加法运算”
-[BCD码的加法运算 ](https://github.com/Xuyang-Han/ysyx_note/edit/main/E/Verilog.md#2bcd%E7%A0%81%E7%9A%84%E5%8A%A0%E6%B3%95)
-[BCD码的加法运算 ](https://github.com/XuyangHan/ysyx_note/blob/main/E/Verilog.md#2bcd%E7%A0%81%E7%9A%84%E5%8A%A0%E6%B3%95%E8%BF%90%E7%AE%97)
 [BCD码的加法运算 ](https://github.com/Xuyang-Han/ysyx_note/blob/main/E/Verilog.md#2bcd%E7%A0%81%E7%9A%84%E5%8A%A0%E6%B3%95%E8%BF%90%E7%AE%97)
 
 ```verilog
