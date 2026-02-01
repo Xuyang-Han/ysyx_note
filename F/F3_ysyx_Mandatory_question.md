@@ -936,3 +936,4 @@ D=0时，上升沿时输出Q=0，not_Q=1，另D=not_Q=1，又翻转一次；
 已经过测试，可以正常进位显示。
 
 ![image-20260114182225667](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260114182225667.png)
+
