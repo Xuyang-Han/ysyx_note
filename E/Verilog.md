@@ -70,8 +70,9 @@ endgenerate
 ```
 
 构建100bit的BCD码加法器，点击跳转：
+[BCD码的加法运算 ](####2.BCD码的加法运算)——若无法跳转查找目录“三.其他知识点2.BCD码的加法运算”
 
-[BCD码的加法运算 ](#2bcd码的加法运算)
+[BCD码的加法运算 ](#2bcd码的加法运算): github和gitee能跳转的格式
 
 ```verilog
 input [399:0] a, b,
@@ -169,9 +170,8 @@ always@(*) begin
    integer i;
    integer count;  // 不要在这里写初始化，因为综合工具会忽略，而且我们会在always块中初始化
    assign out=0;  //会出现2次对out赋值，非法
-   always @(*) begin $\textcolor{Blue}{}$
-
-       '''count = 0;  // 重要：在组合逻辑中，每次执行都要初始化
+   always @(*) begin 
+       count = 0;  // 重要：在组合逻辑中，每次执行都要初始化
        out=0;  //在always语句块内对wire赋值非法，必须使用assign赋值
        for(i=0;i<255;i++) begin
            if(in[i]==1)
@@ -234,14 +234,17 @@ endmodule
 #### 1）Vector向量
 
 定义向量：input/output wire ［高位：低位］vec_name
-*   可以是［7:0］也可以是［0：7］，即大小可以反过来，命名不同，线本身不变
+
+*   可以是［7:0］也可以是［0:7］，即大小可以反过来，命名不同，线本身不变
 *   意思为 定义了 一个8bit的 输入/输出 电线，叫vec
 
 定义：input/output wire b 0:3 向量不得随意改变bit编号大小顺序
+
 *   b3:0 是非法的, “向量部分选择的方向必须与声明的方向一致”
 *   人话：同一个向量的bit编号必须一致从大到小，或从小到大
 
 定义一般变量 input/output x
+
 * 默认是1bit
 
 
@@ -276,14 +279,15 @@ endmodule
 
 * 一般来说，wire是连线，reg是有存储功能的部件  
 
-*   reg不是任何时候都是寄存器，只有在clk存在时才是寄存器
-    ```
-    reg q; // 这会被综合成寄存器（有时钟）
-    always @(posedge clk) q <= d; // 时序逻辑 → 寄存器 // 这不会综合成寄存器（无时钟）
-    
-    reg y; // 组合逻辑 → 只是连线(无时钟)
-    always @(*) y = a & b; 
-    ```
+* reg不是任何时候都是寄存器，只有在clk存在时才是寄存器
+
+  ```
+  reg q; // 这会被综合成寄存器（有时钟）
+  always @(posedge clk) q <= d; // 时序逻辑 → 寄存器 // 这不会综合成寄存器（无时钟）
+  
+  reg y; // 组合逻辑 → 只是连线(无时钟)
+  always @(*) y = a & b; 
+  ```
 
 ## 三.其他知识点
 
@@ -326,6 +330,7 @@ endmodule
 需要注意的点：
 
 - 给出子模块BCD加法器，可以默认该加法器已经实现2个BCD码加法功能；
+- 进位链cout_i的大小选取：是跟随100bit还是99bit或者是101bit，是看循环了多少次，然后进行选择；
 - 由于generate的特点，不能有两个genvar常量，所以必须要  genvar  i  可以同时控制——进位链cout_i和加法器的位置选取，如下代码：
 
 ```verilog
