@@ -29,10 +29,7 @@
 ![image-20260118120556553](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260118120556553.png)
 
 addi指令是I型指令，指令编码如下，
-
-![image-20260118121123829](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260118121123829.png)
-
-![image-20260118121155717](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260118121155717.png)
+![image-20260118121155717](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260118121155717.pnghttps://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260119122816098.png)
 
 具体功能是：
 
@@ -319,3 +316,4 @@ sum和mem运行的结果是：在3000个左右时钟后会一直循环halt，并
 ​          通过Logisim_evolution设计处理器其实并不高效，而且很受限，比如不同的电路有不同的规格就会影响处理器的设计和功能实现，RISC-V32l规定PC=32bit，但是Logisim_evolution里面的ROM和RAM的addr最高只有20bit，同时需要考虑地址和PC层次转化的问题。还有我设计的电路里面有些比较繁琐，其实可以用更少的部件去实现，出于能跑就不去改的原则（以及懒得再改）我只修改了一部分子电路，但是有些地方其实可以更加优化。不过答疑会上助教们也说过，后面是拿代码设计处理器，可以暂时不考虑优化电路。
 
 ​          这次的电路设计经历让我感觉：嘿！设计处理器还挺好玩的。设计完找bug很痛苦，但是当点击Ctrl+k后看到logo一点点加载出来，那一刻的成就感是任何娱乐项目都无法替代的，经历了整整六天的设计，算是自己的第一个处理器问世了吧，后面就是代码的世界啦，加油！再接再厉！
+
