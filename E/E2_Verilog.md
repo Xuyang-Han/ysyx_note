@@ -1,5 +1,3 @@
-
-
 # Verilog语法
 
 关于写练习题时遇到的语法疑惑或者错误
@@ -227,11 +225,43 @@ always@(*) begin
 endmodule
 ```
 
+#### 4）其他
+
+- ##### 赋值给input是不被允许的
+
+  ```verilog
+  if(a[7]==1)begin
+     a[7:0]={a[7],{~a[6:0]}};//取反
+     ...
+  ```
+
+  但赋值给a本身是不允许的，因为a是输入。所以需要将结果赋给另一个信号，比如output类型
+
+
+
+
+
+### 3.其他模块
+
+#### 1)层级
+
+层级就是嵌套，比如一位全加器组成8bit全加器，注意不需要任何语句前缀assign或者always；
+
+如何嵌套？在主模块写上子模块的实例，子模块需要在主模块以外定义，不得在子模块内部实例化，如下：
+
+```verilog
+module top_module (input a, input b, input c,input d,output out1,output out2);   
+    mod_a ex1(.out1(out1),.out2(out2),.in1(a),.in2(b),.in3(c),.in4(d));
+endmodule
+```
+
+
+
 ## 二.定义变量
 
 关于一些变量的定义和赋值的要点
 
-#### 1）Vector向量
+### 1.Vector向量
 
 定义向量：input/output wire ［高位：低位］vec_name
 
@@ -248,34 +278,35 @@ endmodule
 * 默认是1bit
 
 
-#### 2）关于赋值
+### 2.关于赋值
 
-##### 1.把一个8bit向量赋值给另一个1bit输出
+#### 1)把一个8bit向量赋值给另一个1bit输出
 
 *   x=veci
 
-##### 2.把一个8bit向量赋值给另一个8bit向量输出（向量赋值向量）
+#### 2)把一个8bit向量赋值给另一个8bit向量输出（向量赋值向量）
 
 *   非法：高位：低位 vec_out=input——vec_out前面不能加维度，只能加在后面
 *   合法： vec_out =input ——直接赋值即可，前提是input和vec_out的维度匹配
 
-##### 3.把一个8bit向量 截断 赋值给另一个4bit的向量输出
+#### 3)把一个8bit向量 截断 赋值给另一个4bit的向量输出
 
 *   非法：高位：低位 vec_out=input —— vec_out前面不能加维度，只能加在后面
 *   合法： vec_out a：b =input3：0 —— 意思是vec_out a =input{7]，vec_out b =input0
 
-##### 4.拼起来赋值
+#### 4)拼起来赋值
 
 *   拼向量：assign {w,x,y,z7:2} = {a,b,c,d,e,f};
 *   拼常量： assign z1:0={2'b11};——写法：n'b10101(n是要赋值的比特数，b表示比特，后面是常数)
 *   拼多个相同的常量
     *   assign ={2{2'b11}}
     *   assign ={ { 2{2'b11} } , in} ——如有封装且还有其他拼接元素，必须带一个大括号
+    *   延伸： 16'hffff  指  ffffH 中取16bit，最前面的值指bit数，不管后面是什么进制
 *   拼多个相同的变量
     *   assign ={ 2{a , b , c } }
     *   assign ={ { 2{a , b , c } } , in}
 
-#### 3）wire和reg的区别
+### 3.wire和reg的区别
 
 * 一般来说，wire是连线，reg是有存储功能的部件  
 
@@ -289,9 +320,11 @@ endmodule
   always @(*) y = a & b; 
   ```
 
+hdlbits：用户名Emma_321；密码hxyzhk0519
+
 ## 三.其他知识点
 
-#### 1.奇偶校验
+### 1.奇偶校验
 
 奇偶校验的基本思想是：通过添加一个额外的位（称为奇偶校验位），使得整个数据（包括校验位）中1的个数为奇数（奇校验）或偶数（偶校验）。
 
@@ -299,15 +332,15 @@ endmodule
 
 奇校验位= 每一邻位进行异或，再取反.
 
-#### 2.BCD码的加法运算
+### 2.BCD码的加法运算
 
-##### **1)BCD码**
+#### **1)BCD码**
 
 把十进制数利用n个4bit二进制表示出来.（此刻不仅仅讨论4bit的BCD码，而是nbit的BCD码）
 
 把十进制数分个十百千位利用n个4bit二进制表示出来。比如，如果是2位十进制数，那么就需要两个4bit的二进制，分别来表示十位和个位. 若是a+b=3+8=11，11>9则需要拆分为10+1,二进制表示为：1010  0001 B
 
-##### 2)**BCD码的加法**
+#### 2)**BCD码的加法**
 
 先只讨论一个4bit的BCD码
 
@@ -325,7 +358,7 @@ endmodule
 
 此处cout为1bit，所以只是讨论20以内的加法。
 
-##### 3)**构建100bit的BCD码加法器**
+#### 3)**构建100bit的BCD码加法器**
 
 需要注意的点：
 
@@ -355,5 +388,171 @@ input [399:0] a, b,
 endmodule
 ```
 
+### 3.运算符号
 
+a xnor b 意思是  a  同或 b
+
+a  xor b  意思是   a 异或 b
+
+### 4.补码加法
+
+1）补码加法本身就是二进制加法，不需要预处理取反再计算，我写的变换多余，
+2）对于有符号补码加法，直接使用二进制加法即可，溢出判断用符号位检查。
+
+
+
+## 四.实例化
+
+### 1.触发器模板
+
+```verilog
+// 触发器模板
+module Reg #(WIDTH = 1, RESET_VAL = 0) (
+  input clk,
+  input rst,
+  input [WIDTH-1:0] din,
+  output reg [WIDTH-1:0] dout,
+  input wen
+);
+  always @(posedge clk) begin
+    if (rst) dout <= RESET_VAL;
+    else if (wen) dout <= din;
+  end
+endmodule
+
+// 使用触发器模板的示例
+module example(
+  input clk,
+  input rst,
+  input [3:0] in,
+  output [3:0] out
+);
+  // 位宽为1比特, 复位值为1'b1, 写使能一直有效
+  Reg #(1, 1'b1) i0 (clk, rst, in[0], out[0], 1'b1);
+  // 位宽为3比特, 复位值为3'b0, 写使能为out[0]
+  Reg #(3, 3'b0) i1 (clk, rst, in[3:1], out[3:1], out[0]);
+endmodule
+```
+
+
+
+### 2.选择器模板
+
+```verilog
+// 选择器模板内部实现
+module MuxKeyInternal #(NR_KEY = 2, KEY_LEN = 1, DATA_LEN = 1, HAS_DEFAULT = 0) (
+  output reg [DATA_LEN-1:0] out,
+  input [KEY_LEN-1:0] key,
+  input [DATA_LEN-1:0] default_out,
+  input [NR_KEY*(KEY_LEN + DATA_LEN)-1:0] lut
+);
+
+  localparam PAIR_LEN = KEY_LEN + DATA_LEN;
+  wire [PAIR_LEN-1:0] pair_list [NR_KEY-1:0];
+  wire [KEY_LEN-1:0] key_list [NR_KEY-1:0];
+  wire [DATA_LEN-1:0] data_list [NR_KEY-1:0];
+
+  genvar n;
+  generate
+    for (n = 0; n < NR_KEY; n = n + 1) begin
+      assign pair_list[n] = lut[PAIR_LEN*(n+1)-1 : PAIR_LEN*n];
+      assign data_list[n] = pair_list[n][DATA_LEN-1:0];
+      assign key_list[n]  = pair_list[n][PAIR_LEN-1:DATA_LEN];
+    end
+  endgenerate
+
+  reg [DATA_LEN-1 : 0] lut_out;
+  reg hit;
+  integer i;
+  always @(*) begin
+    lut_out = 0;
+    hit = 0;
+    for (i = 0; i < NR_KEY; i = i + 1) begin
+      lut_out = lut_out | ({DATA_LEN{key == key_list[i]}} & data_list[i]);
+      hit = hit | (key == key_list[i]);
+    end
+    if (!HAS_DEFAULT) out = lut_out;
+    else out = (hit ? lut_out : default_out);
+  end
+endmodule
+
+// 不带默认值的选择器模板
+module MuxKey #(NR_KEY = 2, KEY_LEN = 1, DATA_LEN = 1) (
+  output [DATA_LEN-1:0] out,
+  input [KEY_LEN-1:0] key,
+  input [NR_KEY*(KEY_LEN + DATA_LEN)-1:0] lut
+);
+  MuxKeyInternal #(NR_KEY, KEY_LEN, DATA_LEN, 0) i0 (out, key, {DATA_LEN{1'b0}}, lut);
+endmodule
+
+// 带默认值的选择器模板
+module MuxKeyWithDefault #(NR_KEY = 2, KEY_LEN = 1, DATA_LEN = 1) (
+  output [DATA_LEN-1:0] out,
+  input [KEY_LEN-1:0] key,
+  input [DATA_LEN-1:0] default_out,
+  input [NR_KEY*(KEY_LEN + DATA_LEN)-1:0] lut
+);
+  MuxKeyInternal #(NR_KEY, KEY_LEN, DATA_LEN, 1) i0 (out, key, default_out, lut);
+endmodule
+```
+
+以下代码通过使用选择器模板来分别实现2选1多路选择器和4选1多路选择器:
+
+```verilog
+module mux21(a,b,s,y);
+  input   a,b,s;
+  output  y;
+  MuxKey #(2, 1, 1) i0 (y, s, {
+    1'b0, a,
+    1'b1, b
+  });
+endmodule
+
+module mux41(a,s,y);
+  input  [3:0] a;
+  input  [1:0] s;
+  output y;
+  MuxKeyWithDefault #(4, 2, 1) i0 (y, s, 1'b0, {
+    2'b00, a[0],
+    2'b01, a[1],
+    2'b10, a[2],
+    2'b11, a[3]
+  });
+endmodule
+```
+
+
+
+简单版本2-1选择器：
+
+```verilog
+//2-1MUX
+module mux21(
+  input  [7:0] a,
+  input  [7:0] b,
+  input  s,
+  output [7:0]y
+);
+  assign y=(s==0) ? a :
+           (s==1) ? b :
+           a;
+endmodule
+```
+
+寄存器模板：
+
+```verilog
+//Reg
+module register8(
+  input  en,rst,clk,
+  input  [7:0] data,
+  output reg [7:0] q
+);
+    always @(posedge clk) //上升沿触发
+    if (rst==1)
+        q <= 0;
+    else if (en == 1)
+        q <= data;
+endmodule
+```
 
