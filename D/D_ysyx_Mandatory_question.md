@@ -9,8 +9,8 @@
 > YEMU可以看成是一个简化版的NEMU, 它们的原理是相通的, 因此你需要理解YEMU是如何执行程序的. 具体地, 你需要
 >
 > - 画出在YEMU上执行的加法程序的状态机
->- 通过RTFSC理解YEMU如何执行一条指令
-> 
+> - 通过RTFSC理解YEMU如何执行一条指令
+>
 > 思考一下, 以上两者有什么联系?
 
 答：YEMU每次执行完一个操作，比如取指，状态机就会改变（PC的值），再继续译码，执行……，就会对应更改状态机相应的内容。
@@ -21,7 +21,7 @@
 
 > [!IMPORTANT]
 >
->  这一小节的细节非常多, 你可能需要多次阅读讲义和代码才能理解每一处细节. 根据往届学长学姐的反馈, 一种有效的理解方法是通过做笔记的方式来整理这些细节. 事实上, 配合GDB食用效果更佳.
+> 这一小节的细节非常多, 你可能需要多次阅读讲义和代码才能理解每一处细节. 根据往届学长学姐的反馈, 一种有效的理解方法是通过做笔记的方式来整理这些细节. 事实上, 配合GDB食用效果更佳.
 >
 > 为了避免你长时间对代码的理解没有任何进展, 我们就增加一道必答题吧:
 >
@@ -52,7 +52,7 @@ riscv64-unknown-elf-objdump -d -M no-aliases 要转化的elf文件
 
 ###### Li指令（此处是C扩展，并非dummy程序里面的Li指令）
 
-![image-20260413153013702](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260413153013702.png)
+![image-20260413153013702](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260413153013702.jpg)
 
 ##### 2.jal指令的立即数imm
 
@@ -60,7 +60,7 @@ riscv64-unknown-elf-objdump -d -M no-aliases 要转化的elf文件
 
 ![image-20260415151204699](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/image-20260415151204699.png)
 
-![img](https://gitee.com/brownie145810/ysyx_pic/raw/master/ysyx_pic/941c7e32bc83e27e987b15355797b932.png)
+![img](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/941c7e32bc83e27e987b15355797b932.jpg)
 
 指令操作：
 
@@ -238,6 +238,7 @@ Q：DPI-C机制必须在顶层top.v里import吗，可以定义在顶层，但是
 A：
 
 - DPI-C的原理是一座桥，与C语言的.h文件不同，.sv是一个通道，原文件只有一个，但是可以有无数个桥通向它，所以不会出现重复引用；
+
 - C语言的.h文件是文本复制，所以会出现重复加载的情况。
 
 - package操作2步走：定义与引用
