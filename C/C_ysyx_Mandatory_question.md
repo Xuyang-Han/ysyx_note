@@ -8,7 +8,7 @@
 
 A：和实现监视点的思路很类似，使用缓冲池来实现。
 
-![image-20260515173101543](/home/Yang/.config/Typora/typora-user-images/image-20260515173101543.png)
+![image-20260515173101543](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260515173101543.jpg)
 
 
 
@@ -26,7 +26,7 @@ A：和实现监视点的思路很类似，使用缓冲池来实现。
 >
 > 噢, 那就参考一下itrace的相关实现吧: 尝试在Kconfig和相关文件中添加相应的代码, 使得我们可以通过menuconfig来打开或者关闭mtrace. 另外也可以实现mtrace输出的条件, 例如你可能只会关心某一段内存区间的访问, 有了相关的条件控制功能, mtrace使用起来就更加灵活了.
 
-![image-20260516152638885](/home/Yang/.config/Typora/typora-user-images/image-20260516152638885.png)
+![image-20260516152638885](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260516152638885.jpg)
 
 
 
@@ -199,7 +199,7 @@ Q：发生了wdata赋值一直错误的情况
 
 A：原因是sv语句的多个命名，会导致最后只选择一个“支配类型”。
 
-![image-20260601205532018](/home/Yang/.config/Typora/typora-user-images/image-20260601205532018.png)
+![image-20260601205532018](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260601205532018.jpg)
 
 
 
