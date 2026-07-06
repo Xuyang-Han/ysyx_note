@@ -862,25 +862,146 @@ gcc: $(CAPSTONE_LIB) $(CSRC) $(VSRC)
 
 ```
 
-
+------
 
 ##### 2.函数问题
 
-1. **解决 `VARHIDDEN`**：
-   函数参数名从 `CSR_addr` 和 `wdata` 改为 `addr` 和 `data`，不再与模块端口（`CSR_addr`）和内部信号（`wdata`）冲突。
+- **解决 `VARHIDDEN`**：
+  函数参数名从 `CSR_addr` 和 `wdata` 改为 `addr` 和 `data`，不再与模块端口（`CSR_addr`）和内部信号（`wdata`）冲突。
 
-2. **解决 `NORETURN` 和 `UNDRIVEN`**：
-   `csr_write` 函数不需要返回值，因此将其声明为 `function void`，不再有返回值赋值的问题。
+- **解决 `NORETURN` 和 `UNDRIVEN`**：
+  `csr_write` 函数不需要返回值，因此将其声明为 `function void`，不再有返回值赋值的问题。
 
-3. **解决 `IGNOREDRETURN`**：
-   由于 `csr_write` 现在是 `void`，调用它时不会返回值，所以 `EXU.v` 中的 `csr_write(CSR_addr, wdata);` 语句不再产生“忽略返回值”的警告。
+- **解决 `IGNOREDRETURN`**：
+  由于 `csr_write` 现在是 `void`，调用它时不会返回值，所以 `EXU.v` 中的 `csr_write(CSR_addr, wdata);` 语句不再产生“忽略返回值”的警告。
 
-   ```verilog
-   function [31:0] csr_read(input [11:0] addr);
-   function void csr_write(input [11:0] addr,input [31:0] data);
-   ```
+  ```verilog
+  function [31:0] csr_read(input [11:0] addr);
+  function void csr_write(input [11:0] addr,input [31:0] data);
+  ```
 
-   
+------
+
+##### 3.实现AM中NPC的`cte.c`
+
+1）32e指令集&32指令集包含的寄存器个数不同
+
+`riscv32e`指令集：16个
+
+`riscv32`指令集：32个
+
+所以在实现`trap.S`时，有些寄存器的名字不能使用，比如`t0`
+
+------
+
+4.
+
+```bash
+0x80000498: 00812103    lw       sp, 8(sp)
+[sv] sel=00000004
+mtrace: op=0x4,r_mask=15,M[0x8b44]=RAM_rdata=0x80010b3c
+[sv] time 56320,dnpc=0x800004a0
+0x8000049c: 30200073    mret     
+[sv] time 56321,dnpc=0x800000b0
+[sv] sel=00000030
+❌ DiffTest FAIL at PC: NPC=0x800004a0, REF=0x800000b0
+```
+
+mepc和nemu一致，说明是跳转指令的问题，在pc_reg中设置正确的snpc后，bug消失。
+
+
+
+```shell
+0x80000114: 00070463    beq      a4, 0x8000011c
+[sv] sel=0000000d
+[sv] time 101862,dnpc=0x8000011c
+0x80000118: 00b72023    sw       a1, 0(a4)
+cpp: 电路层次 RAM_addr=0x1b191a5d,RAM_wdata=0x80110f78,w_mask=0xf,op=0x5
+cpp: ISA层次  RAM_addr=0x6c646974,RAM_wdata=0x80110f78,w_mask=0xf,op=0x5
+Error: pmem_write 电路层面内存地址 0x1b191a5d 溢出
+Vtop: /home/Yang/ysyx/ysyx-workbench/npc/csrc/main.cpp:101: void pmem_write(const svBitVecVal*, const svBitVecVal*, const svBitVecVal*, const svBitVecVal*): Assertion `0' failed.
+make[1]: *** [Makefile:37: run] Aborted (core dumped)
+make[1]: Leaving directory '/home/Yang/storage/ysyx/ysyx-workbench/npc'
+make: *** [/home/Yang/ysyx/ysyx-workbench/abstract-machine/scripts/platform/npc.mk:30: run] Error 2
+Yang@yyl-Ubuntu:~/storage/ysyx/ysyx-workbench/Templates/r
+```
+
+测试过了，两个bug没有任何关联。
+
+
+
+问题出现在下一条指令应该是`8000011c`，因为是初始化线程，此时的from==0,所以不执行存储指令，只执行访存
+
+```
+80000114:	00070463    beqz	a4,8000011c <ev_handler+0x20>
+80000118:	00b72023    sw		a1,0(a4)
+8000011c:	0007a503    lw		a0,0(a5)
+```
+
+![image-20260706213750012](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260706213750012.jpg)
+
+
+
+> [!CAUTION]
+>
+> Q1：帮我预测一下的下一条指令
+>
+> ```
+> 80000114:  00070463        beq	a4,zero,8000011c <ev_handler+0x20>
+> ```
+>
+> ```
+> 800000fc <ev_handler>:
+> 800000fc:	00052783          	lw	a5,0(a0)
+> 80000100:	00100713          	addi	a4,zero,1
+> 80000104:	02e79063          	bne	a5,a4,80000124 <ev_handler+0x28>
+> 80000108:	0085a783          	lw	a5,8(a1)
+> 8000010c:	0007a703          	lw	a4,0(a5)
+> 80000110:	0047a783          	lw	a5,4(a5)
+> 80000114:	00070463          	beq	a4,zero,8000011c <ev_handler+0x20>
+> 80000118:	00b72023          	sw	a1,0(a4)
+> 8000011c:	0007a503          	lw	a0,0(a5)
+> 80000120:	00008067          	jalr	zero,0(ra)
+> 80000124:	ff410113          	addi	sp,sp,-12
+> ```
+>
+> A1：由于 `beq a4, zero, 8000011c` 是条件分支，其下一条指令**取决于 `a4` 的值是否为 0**。
+> `a4` 的值来源于指令 `lw a4, 0(a5)`，而 `a5` 是从 `c->gpr[2]`（即栈指针 `sp`）处加载的 `sp[0]`（即 `from` 参数）。
+>
+> - **若 `from == 0`**（通常发生在 `rt_hw_context_switch_to` 调用时，表示不保存旧上下文），则**分支成立**，下一条指令是 **`0x8000011c`**（`lw a0, 0(a5)`），跳过保存当前上下文的 `sw a1, 0(a4)`。
+> - **若 `from != 0`**（通常发生在 `rt_hw_context_switch` 调用时，需要保存旧上下文），则**分支不成立**，下一条指令是 **`0x80000118`**（`sw a1, 0(a4)`），即执行 `*(Context **)from = c`。
+>
+> 所以无法静态给出唯一答案，需看具体的调度调用场景。
+>
+> 
+>
+> Q2：此时是第一次运行RT，是不是from==0.下一条指令应该是下一条指令是 0x8000011c（lw a0, 0(a5)）
+>
+> A2：是的，第一次运行 RT 时系统通过 `rt_hw_context_switch_to` 发起首次调度，该函数**不保存旧上下文**，因此传入的 `from = 0`。
+>
+> 在 `ev_handler` 反汇编中：
+>
+> - `80000108: lw a5,8(a1)` → `a5 = c->gpr[2]`（栈指针 sp）
+> - `8000010c: lw a4,0(a5)` → `a4 = sp[0] = from`
+> - `80000114: beq a4,zero,8000011c` → 因为 `from == 0`，**分支成立**，跳转到 `8000011c`
+>
+> 所以下一条指令确实是：
+>
+> text
+>
+> ```
+> 8000011c:   0007a503    lw    a0,0(a5)   // a0 = sp[1] = to
+> ```
+>
+> 
+>
+> 接着执行 `jalr zero,0(ra)`，从 `*(Context **)to` 加载新线程的上下文，然后返回，完成首次线程切换。
+
+
+
+
+
+
 
 
 
