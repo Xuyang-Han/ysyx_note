@@ -1,3 +1,67 @@
+# git基本操作
+
+## 1）创建/切换/删除 分支
+
+```bash
+git branch               #查看所有分支/查看当前分支*
+git status               #查看当前分支
+git checkout 分支名       #切换到某个分支/Hash的前4位，即可创建一个对应的新分支
+git checkout -b 分支名    #创建某个分支
+git branch -D 11a4       #删除叫11a4的分支
+```
+
+## 2）操作分支
+
+### a.查看分支内容
+
+```bash
+git log                          #查看新的提交信息
+git status                       #查看文件有哪些变化
+git diff                         #更直观的看有哪些变化
+git show 11a4:semu.c >> 11a4.c   #查看11a4分支下的semu.c文件，并且存储到11a4.c文件里
+```
+
+==绝对不要==使用这个读档，==比这个存档新的所有记录都将被删除==，这意为着不能随便回到"将来"了.
+
+```bash
+git reset --hard b87c         #绝对不要使用这个读档
+```
+
+### b.给分支添加新文件
+
+``` bash
+git add (文件名)file.c         #把当前文件存到暂存区
+git add .                     #把所有改动过的文件存到暂存区
+git reset HEAD minirv32       #清除刚刚提交该分支的文件
+git status                    #再次确认文件列表
+git commit                    #把暂存区所有文件提交到永久区，会进入vim进行编辑
+git commit --allow-empty      #这样允许提交没做任何修改的相同文件
+git commit  文件名1 文件名2     #把暂存区的2个文件提交到永久区
+git commit -m                 #把暂存区所有文件提交到永久区，不会进入vim，直接提交编辑内容
+```
+
+### c.合并分支（待定）（待测试）
+
+```bash
+git checkout master               #先切换到主分支
+git merge 11a4（要合并的分支名）     #合并11a4到master，但不删除11a4
+```
+
+## 3）自己的常用git指令
+
+```bash
+git add 文件(夹)名  #把当前文件存到暂存区
+git restore .      #丢弃主仓库当前所有未git commit的修改（就是红色的）
+git restore --staged . #清除暂存区
+git restore --staged homework/Two_way_switch/obj_dir/Vtop* #清除暂存区中某个特定的文件
+git rm --cached -f nemu/tools/capstone/repo  #删除暂存区的某个文件夹
+git ls-tree tracer-ysyx #查看分支tracer-ysyx的目录
+git ls-tree tracer-ysyx:homework #查看tracer-ysyx分支下文件夹homework的目录
+cat scripts/pdk/icsprout55.tcl  #获取该tcl文件
+```
+
+
+
 # B1必答题
 
 ## Simple Bus协议
@@ -76,7 +140,7 @@ slave无状态变化，只负责发送`ready`信号
 
 #### Q：评估单周期NPC的主频和程序性能
 
-> [!IMPORTANT]
+>  [!IMPORTANT]
 >
 > 在进一步修改NPC之前, 尝试通过你在预学习阶段中使用的`yosys-sta`项目来评估当前NPC的主频. 不过在评估之前, 你需要进行以下工作:
 >
@@ -110,7 +174,7 @@ A：
 
 #### Q：支持SimpleBus的IFU
 
-> [!IMPORTANT]
+>  [!IMPORTANT]
 >
 > 根据上文, 让IFU支持SimpleBus协议. 对于存储器的取指部分, 你可以参考如下代码:
 >
@@ -186,7 +250,7 @@ slave无状态变化，只负责发送`ready`信号
 
 ###### 1）如何实现master的2个状态？
 
-`state`的实现可以利用类似于`nemu`里面的`cpu.state`,通过菜单来定义状态，在verilog内部使用`localparam`或是`parameter`来定义不同的状态（也可以使用assign，但`parameter`更好管理）。
+`state`的实现可以利用类似于`nemu`里面的`cpu.state`,通过菜单来定义状态，在`verilog`内部使用`localparam`或是`parameter`来定义不同的状态（也可以使用`assign`，但`parameter`更好管理）。
 
 当需要命名一个变量有非零初始值，且后续会随着不同情况变化更改，那么就命名为`localparam`或是`parameter`.电路里对应的组件类似于旋钮。
 
@@ -210,11 +274,42 @@ Q：让DiffTest适配多周期处理器
 
 > [!IMPORTANT]
 >
+> [!IMPORTANT]
+>
 > 修改成多周期处理器后, NPC就并非每个周期都执行一条指令了. 为了让DiffTest机制可以正确工作, 你需要对检查的时机稍作调整. 为此, 你可能需要从仿真环境中读取RTL的一些状态, 来帮助你判断应该什么时候进行DiffTest的检查.
 
 ##### Difftest如何修改？
 
 核心：cpp在发送出指令后，执行完成后，也就是下一条指令执行前，IFU变为`idle`状态之前，此时把指令送给`nemu`.
+
+idle -> wait -> 下一条指令的idle
+
+只要在   当前指令的 wait -> 下一条指令的idle  之间 进行difftest对比就可以
+
+##### 另外发现寄存器脏数据问题
+
+问题现象：
+
+在`nemu`的`ref.c`内部`difftest_regcopy`中, 
+
+如果是`memcpy(regs, cpu.gpr, sizeof(cpu.gpr));`就会出现报错溢出，此时打印`sizeof(cpu.gpr) = 128`,
+
+如果是`memcpy(regs, cpu.gpr, 64);` 那么就可以全部覆盖`npc`的16个寄存器,
+
+但是如果是`memcpy(regs, cpu.gpr, 16);`那么就会出现脏数据，只能覆盖前4个寄存器：
+
+```shell
+....
+[nemu] reg[4] = 0x00007fff	[nemu] reg[5] = 0x9d687dda	[nemu] reg[6] = 0x000077ce	[nemu] reg[7] = 0x9de08000
+[nemu] reg[8] = 0x000077ce	[nemu] reg[9] = 0x00000001	[nemu] reg[10] = 0x00000000	[nemu] reg[11] = 0x00000000
+[nemu] reg[12] = 0x00000000	[nemu] reg[13] = 0xadb4d61e	[nemu] reg[14] = 0x000063e0	[nemu] reg[15] = 0xc3e102c4
+```
+
+原因就是`nemu`维护的是32个寄存器，无论`npc`是`riscv32`还是`riscv32e`，所以需要手动选择要使用16个寄存器还是32个寄存器：
+
+```C
+memcpy(regs, cpu.gpr, 16 * sizeof(word_t));
+```
 
 
 
@@ -238,7 +333,7 @@ static unsigned int pc_elc = (pc - 0x80000000);
 
 同样的问题也存在于你代码中的 `static unsigned int IR = 0;` 和 `static unsigned int pc = 0;`，虽然它们赋值为 0 暂时没出明显错误，但完全没有必要使用 `static`，去掉即可。
 
-
+==**解决**==：整体逻辑是不太对的，需要深刻理解计算机是状态机，也就是什么时候做什么事情！按照讲义的思路重新改了一遍，问题在与控制`EXU`模块的执行，使用`wen`来控制寄存器的写入，不要在`ifu_idle`时写入寄存器，取消了`mem_ready`这个值来控制`sel`，`imm`等译码信息的赋值。
 
 
 
@@ -246,6 +341,8 @@ static unsigned int pc_elc = (pc - 0x80000000);
 
 #### Q：支持SimpleBus的LSU
 
+> [!IMPORTANT]
+>
 > [!IMPORTANT]
 >
 > 根据上文, 让LSU支持SimpleBus协议. 对于存储器的数据访问部分, 你可以参考如下代码:
@@ -272,4 +369,206 @@ static unsigned int pc_elc = (pc - 0x80000000);
 > 实现后, 尝试运行一些测试程序, 同时通过查看波形来确认NPC和存储器之间的通信过程是否符合预期. 同样地, 之前能成功运行的程序, 实现SimpleBus后也应同样能成功运行.
 
 
+
+### 更普遍的存储器(2)
+
+
+
+##### 我的bug
+
+###### `Verilog`语法
+
+- 不能有`input reg`
+- 所有寄存器都要在`rst`时赋初值，不然会出现`x`值——我在三个模块内部都缺少
+
+###### 状态机逻辑缺陷
+
+① IFU 状态机
+
+②`IFU`模块和`MEM`模块交互：`MEM`模块判断 `ifu_reqValid == 1`(表示`IFU`有内存请求) ，`IFU`模块判断`ifu_reqReady == 1` （表示`MEM`内存不忙）但是我没有考虑`IFU`有内存请求，但是内存忙的情况。
+
+③`MEM` 状态机
+
+- **记录为哪个模块服务**：MEM 没有记录当前服务的是 IFU 还是 LSU 请求。在 `WAIT` 状态，我同时检查 `ifu_respReady` 和 `lsu_respReady`，如果两个都为 1，无法知道应该置哪个 `reqReady`。
+
+- **发送完`rdata`后撤销信号**：
+
+  ```verilog
+  WAIT：
+  ifu_respValid <= 0;       // MEM模块 已经发送完rdata
+  ```
+
+- **(待定：未更改)`IFU`饥饿**：在 `IDLE` 状态，如果同时有 `lsu_reqValid` 和 `ifu_reqValid`，你的优先级判断是 `if(lsu_reqValid) ... else if(ifu_reqValid) ...`，这样 IFU 会被饿死。如果确实需要仲裁，可以设置固定优先级或轮询。目前简单设计下可以暂时接受，但需注意。
+
+
+
+### 总结
+
+主要问题集中在：
+
+1. **端口类型错误**（`input reg`、缺少 `reg` 声明）。
+2. **复位初始化缺失**。
+3. **状态机中未覆盖所有分支，导致锁存或信号不更新**。
+4. **MEM 缺少服务对象记录，导致响应混乱**。
+5. **请求信号未正确撤销**。
+
+
+
+```shell
+----> 0x800000a0: 00054503    lbu      a0, 0(a0)
+cpp: ISA层次 RAM_addr=0x8000049c,r_mask=0,op=0x6
+mtrace: op=0x6,r_mask=0,M[0x49c]=RAM_rdata=0x54
+❌ DiffTest FAIL at reg a0: NPC=0x8000049c, REF=0x00000054
+```
+
+分析：`lbu`指令取数据成功了，但是没有成功写入寄存器`a0`.
+
+
+
+```shell
+----> 0x80000034: 100007b7    lui      a5, 0x10000
+[sv] imm_U = 00000000,IR = 00000413
+[sv] reg写入 R[08]=00000000
+❌ DiffTest FAIL at PC: NPC=0x80000004, REF=0x80000038
+```
+
+分析：`lui`指令取值的`IR`错误，没有及时更新对应的值。
+
+```shell
+----> 0x800000d0: f65ff0ef    jal      0x80000034
+[sv] reg写入 R[01]=800000d4,sel = 0000000b
+[sv] 时间 224,pc=0x800000d0,snpc=0x80000034,dnpc=0x80000034,IR=0xf65ff0ef
+[sv] 时间 224,SimpleBus_pc_wen=0x1,en=0x1
+----> 0x80000034: 100007b7    lui      a5, 0x10000
+[sv] reg写入 R[08]=00000000,sel = 0000000c
+[sv] 时间 230,pc=0x80000000,snpc=0x80000004,dnpc=0x80000004,IR=0x00000413
+[sv] 时间 230,SimpleBus_pc_wen=0x1,en=0x1
+❌ DiffTest FAIL at PC: NPC=0x80000004, REF=0x80000038
+```
+
+分析：`jal`指令是跳转得到的`dnpc`,但是`IR`不对应，上面的跳转指令执行都正确，所以可能是别的问题，查看波形`snpc<0x80000000`，和我设置更新`pc`的逻辑不对，修改：
+
+![image-20260826162536384](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260826162536384.jpg)
+
+```verilog
+if (rst == 1)
+    pc <= 32'h80000000;   // 复位到内存起始地址
+else if (en == 1 && snpc == 32'h00000000 ) // 原来：snpc < 32'h80000000
+    pc <= 32'h80000000;
+else if (en == 1 && SimpleBus_pc_wen)begin 
+    pc <= snpc;
+```
+
+
+
+
+
+```shell
+----> 0x800000d8: 00140413    addi     s0, s0, 1
+[sv] reg写入 R[08]=8000049d,sel = 0000000c
+
+----> 0x800000dc: 00178793    addi     a5, a5, 1
+[sv] reg写入 R[15]=00000001,sel = 0000000c
+----> 0x800000e0: 00f12023    sw       a5, 0(sp)
+[cpp] ISA层次  RAM_addr=0x80008fb0,RAM_wdata=0x00000001,w_mask=0xf,op=0x5
+当前是sw指令,M[0x00008fb0]=0x00000001
+mtrace：写入内存 ISA M[0x80008fb0]=0x00000001
+
+----> 0x800000e4: 00044503    lbu      a0, 0(s0)
+cpp: ISA层次 RAM_addr=0x8000049c,  r_mask=0,  op=0x6
+mtrace: op=0x00000006,r_mask=0x00000000,M[0x8000049c]=RAM_rdata=0x00000054
+[sv] reg写入 R[10]=00000054, sel = 00000006
+❌ DiffTest FAIL at reg a0: NPC=0x00000054, REF=0x00000052
+```
+
+分析：第1条和第3条的`s0`寄存器的内容不同，可能是`lbu`取的是`s0`的旧值，但是查看波形，发现`s0`的确是在执行`lbu`指令时就已经变成`80000089d`，查看`Mem_addr`形成，发现是自己把低`2bit`清零了.
+
+```verilog
+//内存的地址:load和store
+assign Mem_addr = 
+(sel==32'h4  || sel==32'h6 || sel==32'h5  || sel==32'h7  ||
+ sel==32'h12 || sel==32'h13|| sel==32'h14 || sel==32'h15 ) 
+    ? (Reg[rs1] + imm) & 32'hfffffffc : 32'h80000000; // 不能：低2bit清零
+```
+
+![image-20260826172010257](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260826172010257.jpg)
+
+
+
+```
+----> 0x800002f4: 00f58023    sb       a5, 0(a1)
+[cpp] ISA层次  RAM_addr=0x80008fc0,RAM_wdata=0x00000030,w_mask=0,op=0x7
+mtrace：写入内存 ISA M[0x80008fc0]=0x00000030 
+----> 0x800002f8: 000580a3    sb       zero, 1(a1)
+[cpp] ISA层次  RAM_addr=0x80008fc1,RAM_wdata=0x00000000,w_mask=0x1,op=0x7
+mtrace：写入内存 ISA M[0x80008fc1]=0x00000000 
+----> 0x800002fc: 00100513    addi     a0, 1
+[sv] reg写入 R[10]=00000001,sel = 0000000c
+----> 0x80000300: 02410113    addi     sp, sp, 0x24
+[sv] reg写入 R[02]=80008fb0,sel = 0000000c
+----> 0x80000304: 00008067    jalr     
+[sv] reg写入 R[00]=80000308,sel = 00000001
+----> 0x80000200: 00a12423    sw       a0, 8(sp)
+[cpp] ISA层次  RAM_addr=0x80008fb8,RAM_wdata=0x00000001,w_mask=0xf,op=0x5
+当前是sw指令,M[0x00008fb8]=0x00000001
+mtrace：写入内存 ISA M[0x80008fb8]=0x00000001 
+----> 0x80000204: eea050e3    bge      a0, 0x800000e4
+----> 0x80000208: 01010493    addi     s1, sp, 0x10
+[sv] reg写入 R[09]=80008fc0,sel = 0000000c
+----> 0x8000020c: 00a487b3    add      a5, s1, a0
+[sv] reg写入 R[15]=80008fc1,sel = 00000003
+----> 0x80000210: 00f12223    sw       a5, 4(sp)
+[cpp] ISA层次  RAM_addr=0x80008fb4,RAM_wdata=0x80008fc1,w_mask=0xf,op=0x5
+当前是sw指令,M[0x00008fb4]=0x80008fc1
+mtrace：写入内存 ISA M[0x80008fb4]=0x80008fc1 
+----> 0x80000214: 0004c503    lbu      a0, 0(s1)
+cpp: ISA层次 RAM_addr=0x80008fc0,r_mask=0,op=0x6
+mtrace: op=0x00000006,r_mask=0x00000000,M[0x80008fc0]=RAM_rdata=0x00000000
+[sv] reg写入 R[10]=00000000,sel = 00000006
+❌ DiffTest FAIL at reg a0: NPC=0x00000000, REF=0x00000030
+(npc) m
+请输入 ISA 内存地址 (hex): 0x80008fc0
+len (dec): 5
+读出内存地址 0x80008fc0 后 5 字节:
+M[0x80008fc0]=0x00000000
+M[0x80008fc4]=0x00000000
+M[0x80008fc8]=0x00000000
+M[0x80008fcc]=0x00000000
+M[0x80008fd0]=0x00000000
+(npc) q
+退出仿真！
+test list [1 item(s)]: dummy
+[         dummy] PASS
+```
+
+目前是store和load的逻辑有问题，需要同时修改difftest访问对比内存的逻辑：
+for循环对比当前的RAM_addr的低2bit清零后的，后4个字节的数组内容
+
+
+
+## 批量测试
+
+```shell
+make ARCH=riscv32e-npc run ALL="recursion crc32 if-else shift" -j
+make ARCH=riscv32e-npc run ALL="unalign bit add hello-str bubble-sort" -j
+make ARCH=riscv32e-npc run ALL="movsx leap-year add-longlong max quick-sort" -j
+make ARCH=riscv32e-npc run ALL="fib shuixianhua div pascal mul-longlong" -j
+make ARCH=riscv32e-npc run ALL="select-sort sum fact" -j
+make ARCH=riscv32e-npc run ALL="wanshu dummy prime switch sub-longlong" -j
+make ARCH=riscv32e-npc run ALL="goldbach load-store to-lower-case string mov-c" -j
+make ARCH=riscv32e-npc run ALL="min3 matrix-mul mersenne" -j
+
+make ARCH=riscv32-nemu run ALL="recursion crc32 if-else shift unalign bit add hello-str bubble-sort movsx leap-year add-longlong max quick-sort dummy" -j8
+```
+
+需要命令里面不要`-e $(ELF_FILE)`和`v`，以及关闭`sdb`，其他的无所谓：
+
+```makefile
+un: insert-arg
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run ARGS="-t -d -w -b $(NPCFLAGS)" IMG=$(IMAGE).bin 
+        #-e $(ELF_FILE)(ftrace) 
+        #-v(vga) -t(itrace & mtrace) -w(wtrace) -b(no sdb) -d(difftest)
+```
+
+最大可以一次并行`-j`14个测试文件，但是15个会闪退，可能是内存上限，可以依靠`-j4`来规定最大并行数量。
 
