@@ -473,6 +473,7 @@ A：在`IFU`和`MEM`中 添加随机延迟`LFSR`，但是`LSU`未添加成功，
 需要注意的是，当有2个模块同时向`MEM`模块发出访存请求时，`MEM`模块要如何处理，在进行随机延迟测试中，我并没有加入`LSU`模块的随机延迟，因为我的`MEM`模块是依赖一种巧合来选取的，而非握手信号，所以这里并未添加成功，看后面的那个总线协议是否有相关的定义。
 
 
+---
 
 # git基本操作
 
@@ -538,7 +539,7 @@ cat scripts/pdk/icsprout55.tcl  #获取该tcl文件
 
 
 
-## 批量测试
+# 批量测试
 
 ```shell
 make ARCH=riscv32e-npc run ALL="recursion crc32 if-else shift" -j
