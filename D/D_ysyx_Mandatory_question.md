@@ -276,7 +276,7 @@ I型指令
 
 B型指令
 
-![image-20260428171540312](/home/Yang/.config/Typora/typora-user-images/image-20260428171540312.png)
+![image-20260428171540312](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260428171540312.jpg)
 
 译码操作：
 
