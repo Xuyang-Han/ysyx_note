@@ -1718,7 +1718,7 @@ printf("C标准格式: %s", ctime(&now));
 
 ### Q：为NPC添加VGA
 
-
+这个没啥痛苦，很快搞定。
 
 ### Q：为NPC添加键盘输入
 
@@ -1752,7 +1752,7 @@ AI总结：你需要做的所有事情
 
 SDL同时开启VGA和KBD，只识别KBD，不打印画面：
 
-![image-20260813165643129](/home/Yang/.config/Typora/typora-user-images/image-20260813165643129.png)
+![image-20260813165643129](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813165643129.jpg)
 
 
 
