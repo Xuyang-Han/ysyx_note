@@ -1750,8 +1750,6 @@ AI总结：你需要做的所有事情
 
 - 运行成功以后game.c是何时获取键盘寄存器上的数据的？——  日志功能，不进行任何输入的话，AM也会显示，所以可以看作每次npc执行完一次指令后，会检测io/处理io中断——类似程序查询/程序中断(设备发出信息=switch有SDL按键事件)
 
-
-
 SDL同时开启VGA和KBD，只识别KBD，不打印画面：
 
 ![image-20260813165643129](/home/Yang/.config/Typora/typora-user-images/image-20260813165643129.png)
@@ -1762,13 +1760,13 @@ SDL同时开启VGA和KBD，只识别KBD，不打印画面：
 
 排查4 - AM能否正确收到`key_code=0`：按下，松开 ->  最后得到的`key_code=0`，故问题出在，应该按下得到的是`key_code`,而不是`key_code=0`.
 
-![image-20260813204332034](/home/Yang/.config/Typora/typora-user-images/image-20260813204332034.png)
+![image-20260813204332034](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813204332034.jpg)
 
 解决办法：在按下键盘时 锁存`keycode`的值，存到`top->io_keycode`,之后利用load指令再读出`top->io_keycode`.
 
 改了，还是不识别：
 
-![image-20260813214411933](/home/Yang/.config/Typora/typora-user-images/image-20260813214411933.png)
+![image-20260813214411933](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813214411933.jpg)
 
 还有一个SDL扫描码翻译的问题，0x4是A的SDL扫描码，应该识别后转化为AM_KEY_A，我的对应关系不对，修改类似这样的：
 
@@ -1778,9 +1776,7 @@ static int keylut[128] = {
     [0x04] = AM_KEY_A,[0x05] = AM_KEY_B, ....}
 ```
 
-
-
-![image-20260813215034589](/home/Yang/.config/Typora/typora-user-images/image-20260813215034589.png)
+![image-20260813215034589](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813215034589.jpg)
 
 蠢完了！kbd->keydown = 0 一直！上层程序game.c无法通过条件：
 
@@ -1800,7 +1796,7 @@ while (1) {
 
 排查为什么`keyboard_data`没有变成`0x8000+key_code&0x7fff`,`k`是SDL的扫描码
 
-![image-20260813221121578](/home/Yang/.config/Typora/typora-user-images/image-20260813221121578.png)
+![image-20260813221121578](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813221121578.jpg)
 
 bug原因：`keyboard_data`被截断了，设置成8bit了，k可以是8bit，但是`keyboard_data`必须是16bit，或者32bit
 
@@ -1812,9 +1808,9 @@ uint8_t keyboard_data = 0; // 键盘数据寄存器
 
 结算画面！泪目啦
 
-![image-20260813222420321](/home/Yang/.config/Typora/typora-user-images/image-20260813222420321.png)
+![image-20260813222420321](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813222420321.jpg)
 
-![image-20260813220722432](/home/Yang/.config/Typora/typora-user-images/image-20260813220722432.png)
+![image-20260813220722432](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/image-20260813220722432.jpg)
 
 
 
