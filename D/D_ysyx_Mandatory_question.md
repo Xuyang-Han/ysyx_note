@@ -403,7 +403,26 @@ run: ...
 	... ARGS="-b $(NEMUFLAGS)" ...
 ```
 
-`-b`意思是批处理,自动执行`c`
+`-b`意思是批处理,自动执行`c`.
+
+#### 批处理测试
+
+```shell
+make ARCH=riscv32e-npc run ALL="recursion crc32 if-else shift" -j
+# 所有测试程序的集合 -j8
+make ARCH=riscv32e-npc run ALL="recursion crc32 if-else shift unalign bit add hello-str bubble-sort movsx leap-year add-longlong max quick-sort fib shuixianhua div pascal mul-longlong select-sort sum fact wanshu dummy prime switch sub-longlong goldbach load-store to-lower-case string mov-c min3 matrix-mul mersenne" -j8
+```
+
+需要命令里面不要`-e $(ELF_FILE)`和`-v`，以及关闭`sdb`，其他的无所谓：
+
+```makefile
+un: insert-arg
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run ARGS="-t -d -w -b $(NPCFLAGS)" IMG=$(IMAGE).bin 
+        #-e $(ELF_FILE)(ftrace) 
+        #-v(vga) -t(itrace & mtrace) -w(wtrace) -b(no sdb) -d(difftest)
+```
+
+最大可以一次并行`-j`14个测试文件，但是15个会闪退，可能是内存上限，可以依靠`-j4`或者`-j8`来规定最大并行数量。
 
 
 
@@ -423,8 +442,6 @@ run: ...
 ### （待定）未定义行为的编译优化
 
  [这篇文章](https://homes.cs.washington.edu/~akcheung/papers/apsys12.pdf)列举了一些让你大开眼界的花式编译优化例子, 看完之后你就会刷新对程序行为的理解了.
-
-
 
 
 
