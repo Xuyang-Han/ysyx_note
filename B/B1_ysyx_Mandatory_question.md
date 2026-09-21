@@ -891,7 +891,7 @@ make ARCH=riscv32-nemu run ALL="recursion crc32 if-else shift unalign bit add he
 需要命令里面不要`-e $(ELF_FILE)`和`-v`，以及关闭`sdb`，其他的无所谓：
 
 ```makefile
-un: insert-arg
+run: insert-arg
 	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run ARGS="-t -d -w -b $(NPCFLAGS)" IMG=$(IMAGE).bin 
         #-e $(ELF_FILE)(ftrace) 
         #-v(vga) -t(itrace & mtrace) -w(wtrace) -b(no sdb) -d(difftest)
