@@ -1,4 +1,4 @@
-# B1必答题
+# B1 总线
 
 ## Simple Bus协议
 
@@ -13,6 +13,8 @@
 ```
 
 ### 我的疑问
+
+
 
 #### 1）异步总线是何时取值？
 
@@ -753,8 +755,37 @@ RISC-V提供两种物理内存检查机制
 
 总线桥`crossXbar`：目前主设备`master`有2个，分别是`IFU`和`LSU`；从设备有2个分别是`MEM`，`Device_slave` 以及`CLINT`;
 
-- [ ] 修改top.v以及Xbar.v里面的name，Mem和device的name分别对应
-- [ ] 修改Xbar_slave判断：`Xbar`发现目标地址无设备时,resp信号返回`decerr`错误(地址译码错)
+- [x] 修改top.v以及Xbar.v里面的name，Mem和device的name分别对应
+- [x] 修改Xbar_slave判断：`Xbar`发现目标地址无设备时,resp信号返回`decerr`错误(地址译码错)
+
+
+
+仲裁器状态判断：
+
+`IFU`、`LSU`同时请求时，`LSU`优先；但如果上一轮已经给了`LSU`，则让`IFU`。
+
+那么：
+
+```verilog
+wire grant_lsu;
+wire grant_ifu;
+
+assign grant_lsu =
+    lsu_req &&
+    (!ifu_req || !lsu_serve_num);
+
+assign grant_ifu =
+    ifu_req &&
+    (!lsu_req || lsu_serve_num);
+```
+
+| IFU  | LSU  | `lsu_serve_num` | 结果 |
+| ---- | ---- | --------------- | ---- |
+| 0    | 0    | 0/1             | 无人 |
+| 1    | 0    | 0/1             | IFU  |
+| 0    | 1    | 0/1             | LSU  |
+| 1    | 1    | 0               | LSU  |
+| 1    | 1    | 1               | IFU  |
 
 
 
@@ -764,32 +795,41 @@ RISC-V提供两种物理内存检查机制
 >
 > 编写一个`AXI4-Lite`接口的slave模块, 其中包含一个设备寄存器. 当往这个设备寄存器发送写请求时, 则将写入数据的低8位作为字符, 通过`$write()`或`printf()`输出. 为了方便测试, 这个设备寄存器的地址可以设置成与之前仿真环境中串口的地址相同. 实现后, 你还需要自己编写一个`Xbar`模块, 来将这个具备UART功能的模块接入系统中.
 >
-> 事实上, 我们并没有完整地用RTL来实现一个UART, 因为`$write()`或`printf()`仍然需要依赖仿真环境来实现字符的输出. 但作为一个总线的练习, 这已经足够了, 毕竟UART的实现还需要考虑很多电气细节. 不过我们很快就会接入`SoC`, 其中包含一个真实的UART控制器. 现在通过这个练习来测试总线的实现, 将来接入`SoC`的时候也会更顺利.
+> 事实上, 我们并没有完整地用`RTL`来实现一个UART, 因为`$write()`或`printf()`仍然需要依赖仿真环境来实现字符的输出. 但作为一个总线的练习, 这已经足够了, 毕竟UART的实现还需要考虑很多电气细节. 不过我们很快就会接入`SoC`, 其中包含一个真实的`UART`控制器. 现在通过这个练习来测试总线的实现, 将来接入`SoC`的时候也会更顺利.
 
 A：
 
-```text
-             IFU ─────┐
-                      │
-                      ↓
-                 【仲裁器】
-                      │
-              判断这次请求是谁的
-                 /          \
-              IFU            LSU
-               │              │
-               │              ↓
-               │        【地址译码】
-               │          /       \
-               │       SRAM      DEVICE
-               │
-               ↓
-              SRAM
+##### bug：`LSU`发出读/写请求的时机不对
+
+（1）bug原因：在`LSU`模块内部，我是在`IDLE`时根据`lsu_wen`和`lsu_ren`来判断是否要发出`LSU`模块的`Valid`。
+
+​	如果是 `sw`，`addi`两条指令连续执行，但是当还没有取出`addi`的`IR`时，`sw`写入成功后返回到`IDLE`，此时判断依旧成立，就转到了`DELAY`状态，之后就卡在`DELAY`状态出不来了，因为后续2条指令是`addi`，`lbu`，当需要在`lsu`时发出读请求时，此时`LSU`不在`IDLE`状态，就无法进行发出`Valid`请求.
+
+（2）解决思路：`lsu_req_valid` + 锁存当前指令的相关操作数据
+
+​	Q：如何实现`lsu_req_valid`？
+
+​	A：`lsu_req_valid`在当前是首次申请才为1，后续如果还是当前指令则不进行改变，执行完后清零，再等待下一条指令
+
+```tex
+时钟            N       N+1       N+2       N+3       N+4
+---------------------------------------------------------
+IR             sw      sw        sw        addi      lbu
+lsu_wen		    1       1         1         0         0
+lsu_req_valid	1       0         0         0         1
+           		↑                           ↑
+        	第一次提交                      新请求
 ```
 
 
 
+（3）若当前指令是store/load，如果是`ifu_handshake_done == 1` 发生过，那么`IR_new <= 1`,表示当前IR已经更新成功；如果`lsu_handshake_done == 1`,发生过，且发生在`ifu_handshake_done == 1`之后，那么`IR_new <= 0`, 表示该指令执行完成，不再发出`Valid`.
 
+
+
+（4）`PMA`改成了在每个模块内部进行判断，不是整体进行判断。
+
+如果是整体判断的话，那么就无法保证当前的`addr`是有效的。
 
 
 
@@ -797,7 +837,7 @@ A：
 
 > [!IMPORTANT]
 >
-> [CLINT(Core Local INTerrupt controller)](https://chromitem-soc.readthedocs.io/en/latest/clint.html)是RISC-V系统中较通用的中断控制器, 是一个用于维护时钟中断和软件中断的模块. 不过目前我们的系统还不需要中断功能, 因此我们先考虑时钟相关的功能即可.
+> [CLINT(Core Local INTerrupt controller)](https://chromitem-soc.readthedocs.io/en/latest/clint.html)是RISC-V系统中较通用的中断控制器, 是一个用于维护时钟中断和软件中断的模块. 不过目前我们的系统还不需要中断功能, 因此我们先考虑时钟相关的功能即可.  
 >
 > 你需要实现一个`AXI4-Lite`接口的CLINT模块, 并将其接入系统. `CLINT`包含一个只读的设备寄存器`mtime`, 它会以一定的速率增长, 最简单的实现是每周期加1. 同样地, 为了方便测试, 其地址可以设置成与之前仿真环境中时钟的地址相同.
 >
@@ -805,99 +845,12 @@ A：
 >
 > 最后, 你还需要考虑`mtime`寄存器的位宽. 上述手册中定义的`mtime`是64位的, 这是为了避免在实际使用中发生溢出. 但目前`NPC`是32位的, 如果我们只读出`mtime`的低32位, 在一段时间之后, `mtime`将会发生溢出, 从而使系统的时间功能发生错误. 尽管你不太容易在仿真环境中运行到`mtime`溢出的时刻, 但如果`NPC`将来运行在`500MHz`的频率下, 将大概率会发生溢出. 因此, 运行在32位`NPC`上的软件需要依次读出`mtime`的低32位和高32位, 将其组合成一个64位的值, 供上层应用使用.
 
-A：
-
-
-# git基本操作
-
-## 1）创建/切换/删除 分支
-
-```bash
-git branch               #查看所有分支/查看当前分支*
-git status               #查看当前分支
-git checkout 分支名       #切换到某个分支/Hash的前4位，即可创建一个对应的新分支
-git checkout -b 分支名    #创建某个分支
-git branch -D 11a4       #删除叫11a4的分支
-```
-
-## 2）操作分支
-
-### a.查看分支内容
-
-```bash
-git log                          #查看新的提交信息
-git status                       #查看文件有哪些变化
-git diff                         #更直观的看有哪些变化
-git show 11a4:semu.c >> 11a4.c   #查看11a4分支下的semu.c文件，并且存储到11a4.c文件里
-```
-
-==绝对不要==使用这个读档，==比这个存档新的所有记录都将被删除==，这意为着不能随便回到"将来"了.
-
-```bash
-git reset --hard b87c         #绝对不要使用这个读档
-```
-
-### b.给分支添加新文件
-
-``` bash
-git add (文件名)file.c         #把当前文件存到暂存区
-git add .                     #把所有改动过的文件存到暂存区
-git reset HEAD minirv32       #清除刚刚提交该分支的文件
-git status                    #再次确认文件列表
-git commit                    #把暂存区所有文件提交到永久区，会进入vim进行编辑
-git commit --allow-empty      #这样允许提交没做任何修改的相同文件
-git commit  文件名1 文件名2     #把暂存区的2个文件提交到永久区
-git commit -m                 #把暂存区所有文件提交到永久区，不会进入vim，直接提交编辑内容
-```
-
-### c.合并分支（待测试）
-
-
-
-```bash
-git checkout master               #先切换到主分支
-git merge 11a4（要合并的分支名）     #合并11a4到master，但不删除11a4
-```
-
-## 3）自己的常用git指令
-
-```bash
-git add 文件(夹)名  #把当前文件存到暂存区
-git switch tracer-ysyx  # 切换仓库
-git restore .      #丢弃主仓库当前所有未git commit的修改（就是红色的）
-git restore --staged . #清除暂存区
-git restore --staged homework/Two_way_switch/obj_dir/Vtop* #清除暂存区中某个特定的文件
-git rm --cached -f nemu/tools/capstone/repo  #删除暂存区的某个文件夹
-git ls-tree tracer-ysyx #查看分支tracer-ysyx的目录
-git ls-tree tracer-ysyx:homework #查看tracer-ysyx分支下文件夹homework的目录
-cat scripts/pdk/icsprout55.tcl  #获取该tcl文件
-
-#提交错分支的话，这样可以纠正
-git switch tracer-ysyx  # 切换到最终需要提交到的分支下
-git cherry-pick b6eb88(错误提交的Hash编号) 
-```
-
-
-
-# 批处理测试
+A：测试文件：``am-kernel/tests/am-tests`中的`real-time clock test`测试. 
 
 ```shell
-make ARCH=riscv32e-npc run ALL="recursion crc32 if-else shift" -j
-# 所有测试程序的集合 -j8
-make ARCH=riscv32e-npc run ALL="recursion crc32 if-else shift unalign bit add hello-str bubble-sort movsx leap-year add-longlong max quick-sort fib shuixianhua div pascal mul-longlong select-sort sum fact wanshu dummy prime switch sub-longlong goldbach load-store to-lower-case string mov-c min3 matrix-mul mersenne" -j8
-make ARCH=riscv32-nemu run ALL="recursion crc32 if-else shift unalign bit add hello-str bubble-sort movsx leap-year add-longlong max quick-sort fib shuixianhua div pascal mul-longlong select-sort sum fact wanshu dummy prime switch sub-longlong goldbach load-store to-lower-case string mov-c min3 matrix-mul mersenne" -j8
+make ARCH=riscv32-nemu run mainargs=t
+make ARCH=riscv32e-npc run mainargs=t
 ```
 
-需要命令里面不要`-e $(ELF_FILE)`和`-v`，以及关闭`sdb`，其他的无所谓：
-
-```makefile
-run: insert-arg
-	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run ARGS="-t -d -w -b $(NPCFLAGS)" IMG=$(IMAGE).bin 
-        #-e $(ELF_FILE)(ftrace) 
-        #-v(vga) -t(itrace & mtrace) -w(wtrace) -b(no sdb) -d(difftest)
-```
-
-最大可以一次并行`-j`14个测试文件，但是15个会闪退，可能是内存上限，可以依靠`-j4`或者`-j8`来规定最大并行数量。
-
-------
+创建一个新的从设备模块`clint_slave`，实现`mtime`寄存器来计算时钟周期总数，在`am/.../timer.c`内部读出时钟周期总数后，除以仿真主频得到秒，再换算为微秒。
 
