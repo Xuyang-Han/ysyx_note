@@ -471,7 +471,9 @@ A：在`IFU`和`MEM`中 添加随机延迟`LFSR`，但是`LSU`未添加成功，
 
 > **注意**：读事务通过 **R通道** 中的 `RRESP` 信号返回读响应，因此没有单独的“读响应通道”。
 
-![1](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/1.jpg)
+![123](https://cdn.jsdelivr.net/gh/Xuyang-Han/Piclist_imags@main/ysyx_imags/123.jpg)
+
+
 
 ### 握手机制要点
 
