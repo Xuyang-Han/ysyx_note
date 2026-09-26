@@ -14,8 +14,6 @@
 
 ### 我的疑问
 
-
-
 #### 1）异步总线是何时取值？
 
 异步总线是每一个时钟周期都取指并译码一条指令吗？
@@ -654,6 +652,20 @@ make: *** [/home/Yang/ysyx/ysyx-workbench/abstract-machine/scripts/platform/npc.
 
 同时修改了`sh`的逻辑，也是类似的。
 
+其他bug总结：
+
+| Bug                                    | 具体表现                                                     | 根本原因/修复                                                |
+| -------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 1. `pmem_write` 被重复调用             | 加入随机延迟后，串口输出出现 `TTTRRRMMM...`、甚至重复字符    | 把持续多个周期的 `Valid` 当成了一次写请求；应该只在**一次**真正的写事务握手时执行 `pmem_write()` |
+| 2. 延迟状态下重新仲裁                  | LSU 请求进入延迟后，IFU 又可能抢到 MEM                       | `DELAY` 状态不能重新仲裁；必须在进入延迟时锁存 `serving_which`.<br />**简单的来说，就是多个模块内部的延迟不能同时发生，必须一个接着一个** |
+| 3. 延迟期间使用实时地址                | 请求已经等待几周期，但 MEM 仍直接使用 `ifu_arAddr/lsu_arAddr` | 地址必须在 AR 握手时锁存，后面使用锁存值<br />**可以理解为，读出rdata后立刻赋值给IR或者传给EXU模块。不要延迟，值会丢失。** |
+| 4. `RVALID/RDATA` 时序不正确           | 加入延迟后 DiffTest/程序执行异常                             | `RVALID` 拉高后，`RDATA` 必须保持稳定，直到 `RVALID && RREADY` |
+| 5. `BVALID` 不能随意打一拍             | LSU store 在延迟后出现事务异常                               | B 通道同样必须遵守 `VALID/READY` 握手，`BVALID` 应保持到握手完成 |
+| 6. 直接把 `RESP=00` 当作完成           | 对 AXI 响应含义产生混淆                                      | `RESP=00` 只是 OKAY；真正完成要看 `VALID && READY`           |
+| 7. ecall指令的difftest发生pc地址慢一拍 | 异常发生时，CSR 的 `mepc` 保存的是产生异常的那条指令的 PC，而不是异常处理后的 PC，也不是 `PC+4`。 | difftest检测位置不对                                         |
+
+------
+
 
 
 ### 总线的仲裁
@@ -743,7 +755,7 @@ A：需要修改的地方
 
 RISC-V提供两种物理内存检查机制
 
-- [x] `PMA`(Physical Memory Attribute): 地址空间在系统中固定
+- [x] `PMA`(Physical Memory Attribute): 地址空间在系统中==固定==
   - 通过`RTL`实现权限表，在`RTL`设计时写入
 - [ ] `PMP`(Physical Memory Protection): 地址空间动态分配(如`PCI-e`等)
   - 通过`CSR`实现权限表，在系统初始化时由软件写入
@@ -751,16 +763,18 @@ RISC-V提供两种物理内存检查机制
 
 
 
-这里实现多个设备的系统，我主要采用了总线桥`crossXbar` 和 固定内存地址检测的 `PMA`，
+#### 我的设计
 
-总线桥`crossXbar`：目前主设备`master`有2个，分别是`IFU`和`LSU`；从设备有2个分别是`MEM`，`Device_slave` 以及`CLINT`;
+实现多个设备的系统，我主要采用了总线桥`crossXbar` 和 固定内存地址检测的 `PMA`，
+
+总线桥`crossXbar`：目前主设备`master`有2个，分别是`IFU`和`LSU`；从设备有3个分别是`MEM`，`Device_slave` 以及`CLINT`;
 
 - [x] 修改top.v以及Xbar.v里面的name，Mem和device的name分别对应
 - [x] 修改Xbar_slave判断：`Xbar`发现目标地址无设备时,resp信号返回`decerr`错误(地址译码错)
 
 
 
-仲裁器状态判断：
+##### 一. `crossXbar`仲裁器状态判断
 
 `IFU`、`LSU`同时请求时，`LSU`优先；但如果上一轮已经给了`LSU`，则让`IFU`。
 
@@ -789,6 +803,101 @@ assign grant_ifu =
 
 
 
+##### 二. LSU反复发起访存请求
+
+(1) bug原因：在`LSU`模块内部，我是在`IDLE`时根据`lsu_wen`和`lsu_ren`来判断是否要发出`LSU`模块的`Valid`，导致在还没有切换`IR`前就会一直发出访存请求，于是造成`LSU`发出读/写请求的时机不对。
+
+​	如果是 `sw`，`addi`两条指令连续执行，但是当还没有取出`addi`的`IR`时，`sw`写入成功后返回到`IDLE`，此时判断依旧成立，就转到了`DELAY`状态，之后就卡在`DELAY`状态出不来了，因为后续2条指令是`addi`，`lbu`，当需要在`lsu`时发出读请求时，此时`LSU`不在`IDLE`状态，就无法进行发出`Valid`请求.
+
+(2) 解决思路：`IR_new`  +  `lsu_req_sent` + 锁存当前指令的相关操作数据
+
+​	Q：如何变化`lsu_req_sent` ？
+
+​	A：`lsu_req_sent`在当前是首次申请才为1，后续如果还是当前指令则不进行改变，执行完后清零，再等待下一条指令
+
+```tex
+时钟            N       N+1       N+2       N+3       N+4
+---------------------------------------------------------
+IR             sw      sw        sw        addi      lbu
+lsu_wen		    1       1         1         0         0
+lsu_req_sent	1       0         0         0         1
+           		↑                           ↑
+        	第一次提交                      新请求
+```
+
+​	Q：何时变化`IR_new`和 `lsu_req_sent` ？
+
+​	A：状态机如下，
+
+- 如果当前指令是`store/load`（即`is_load_store == 1`），且`ifu_handshake_done == 1` 发生过，
+
+  那么`IR_new <= 1`，表示当前IR已经更新成功；
+
+- 如果`lsu_handshake_done == 1`发生过，且发生在`ifu_handshake_done == 1`之后，
+
+  那么`IR_new <= 0`, 表示该指令执行完成，不再发出`Valid`.
+
+这样就可以实现：在`IR_new <= 1`期间完成`store/load`指令，不会发起二次访存请求
+
+```
+时钟       T0       T1       T2       T3       T4       T5       T6
+          ───────────────────────────────────────────────────────────
+
+ifu_handshake
+                   1
+                   │
+                   ▼
+IR_new      0 ─────┴──────► 1 ─────── 1 ─────── 1 ─────── 1 ─────► 0
+                              │
+                              │ 这期间始终是同一条 IR
+                              │
+lsu_req_sent
+            0 ─────────────► 1 ─────── 1 ─────── 1 ─────── 1 ─────► 0
+                              │
+                              │
+                              └── 禁止重复提交 LSU request
+
+
+lsu_handshake
+                                      ...等待...
+                                                        1
+                                                        │
+                                                        ▼
+                                                  当前访存完成
+```
+
+实现代码：
+
+```verilog
+  always @(posedge clk) begin
+    if (rst) begin
+      lsu_req_sent <= 0;
+      IR_new <= 0;
+    end else begin
+      // 第一次提交
+      if (ifu_handshake_done && is_load_store) begin
+        IR_new <= 1;
+        lsu_req_sent <= 1;
+      end
+
+      if (lsu_handshake_done && is_load_store) begin
+        if (IR_new) begin
+          IR_new <= 0;
+          lsu_req_sent <= 0;
+        end
+      end
+```
+
+（3）`PMA`改成了在每个模块内部进行判断，不是整体进行判断。
+
+旧的判断逻辑：`PMA`整体判断，在`LSU`内部的`IDLE`判断`Mem_addr`是否在区间内部
+
+新的判断逻辑：在每个模块内部进行`PMA`判断，只有需要LSU模块才需要判断
+
+bug原因：如果是整体判断的话，那么就无法保证当前的`Mem_addr`是有效的。比如，`lbu`指令下一条是指令`addi`，此时的`Mem_addr = 0x1000_0000`，此时不需要访存，所以`Mem_addr`无效，但是由于`PMA`是检测当前的`Mem_addr`是否符合区间，而不在乎是什么指令，那么当前的`lbu`在读出`rdata`后就无法进入`IDLE`，所以`lbu`无法结束，而下一条`addi`指令就无法执行。
+
+
+
 #### Q：实现`AXI4-Lite`接口的UART功能
 
 > [!IMPORTANT]
@@ -797,39 +906,7 @@ assign grant_ifu =
 >
 > 事实上, 我们并没有完整地用`RTL`来实现一个UART, 因为`$write()`或`printf()`仍然需要依赖仿真环境来实现字符的输出. 但作为一个总线的练习, 这已经足够了, 毕竟UART的实现还需要考虑很多电气细节. 不过我们很快就会接入`SoC`, 其中包含一个真实的`UART`控制器. 现在通过这个练习来测试总线的实现, 将来接入`SoC`的时候也会更顺利.
 
-A：
-
-##### bug：`LSU`发出读/写请求的时机不对
-
-（1）bug原因：在`LSU`模块内部，我是在`IDLE`时根据`lsu_wen`和`lsu_ren`来判断是否要发出`LSU`模块的`Valid`。
-
-​	如果是 `sw`，`addi`两条指令连续执行，但是当还没有取出`addi`的`IR`时，`sw`写入成功后返回到`IDLE`，此时判断依旧成立，就转到了`DELAY`状态，之后就卡在`DELAY`状态出不来了，因为后续2条指令是`addi`，`lbu`，当需要在`lsu`时发出读请求时，此时`LSU`不在`IDLE`状态，就无法进行发出`Valid`请求.
-
-（2）解决思路：`lsu_req_valid` + 锁存当前指令的相关操作数据
-
-​	Q：如何实现`lsu_req_valid`？
-
-​	A：`lsu_req_valid`在当前是首次申请才为1，后续如果还是当前指令则不进行改变，执行完后清零，再等待下一条指令
-
-```tex
-时钟            N       N+1       N+2       N+3       N+4
----------------------------------------------------------
-IR             sw      sw        sw        addi      lbu
-lsu_wen		    1       1         1         0         0
-lsu_req_valid	1       0         0         0         1
-           		↑                           ↑
-        	第一次提交                      新请求
-```
-
-
-
-（3）若当前指令是store/load，如果是`ifu_handshake_done == 1` 发生过，那么`IR_new <= 1`,表示当前IR已经更新成功；如果`lsu_handshake_done == 1`,发生过，且发生在`ifu_handshake_done == 1`之后，那么`IR_new <= 0`, 表示该指令执行完成，不再发出`Valid`.
-
-
-
-（4）`PMA`改成了在每个模块内部进行判断，不是整体进行判断。
-
-如果是整体判断的话，那么就无法保证当前的`addr`是有效的。
+A：最麻烦的是实现crossXbar，实现后再创建一个从设备模块`Device_slave`，在该模块内部对串口地址`SERIAL_PORT`进行单独识别，再输出wdata即可，串口只支持写。
 
 
 
@@ -852,5 +929,6 @@ make ARCH=riscv32-nemu run mainargs=t
 make ARCH=riscv32e-npc run mainargs=t
 ```
 
-创建一个新的从设备模块`clint_slave`，实现`mtime`寄存器来计算时钟周期总数，在`am/.../timer.c`内部读出时钟周期总数后，除以仿真主频得到秒，再换算为微秒。
+创建一个新的从设备模块`clint_slave`，实现`mtime`寄存器来计算时钟周期总数，当识别到读地址为`RTC_ADDR` 或 `RTC_ADDR + 4`时，在`am/.../timer.c`内部读出时钟周期总数，再除以仿真主频得到秒，再换算为微秒。
 
+`mcycle` 与 `mtime`十分类似，都是计算时钟周期数，但是前者是`CSR`寄存器，后者属于`CLINT`，用于中断。
